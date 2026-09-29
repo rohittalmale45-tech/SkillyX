@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   Activity,
@@ -17,6 +17,7 @@ import {
   GraduationCap,
   House,
   LayoutDashboard,
+  Languages,
   Lightbulb,
   Map,
   Menu,
@@ -51,6 +52,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 const queryClient = new QueryClient();
 
 type Role = 'government' | 'institute' | 'employer' | 'student';
+type Language = 'en' | 'hi' | 'mr';
 type NavItem = { label: string; href: string; icon: LucideIcon; group?: string };
 type Overlay = 'notifications' | 'profile' | null;
 type ProfileDetails = {
@@ -78,6 +80,155 @@ const roles: { id: Role; title: string; description: string; icon: LucideIcon; a
   { id: 'student', title: 'Student & jobseeker', description: 'Turn signals into your next move', icon: Target, accent: 'violet' },
 ];
 
+const languages: { id: Language; label: string; nativeLabel: string }[] = [
+  { id: 'en', label: 'English', nativeLabel: 'English' },
+  { id: 'hi', label: 'Hindi', nativeLabel: 'हिन्दी' },
+  { id: 'mr', label: 'Marathi', nativeLabel: 'मराठी' },
+];
+
+const maharashtraDistricts = [
+  'All Maharashtra',
+  'Ahilyanagar',
+  'Akola',
+  'Amravati',
+  'Beed',
+  'Bhandara',
+  'Buldhana',
+  'Chandrapur',
+  'Chhatrapati Sambhajinagar',
+  'Dharashiv',
+  'Dhule',
+  'Gadchiroli',
+  'Gondia',
+  'Hingoli',
+  'Jalgaon',
+  'Jalna',
+  'Kolhapur',
+  'Latur',
+  'Mumbai City',
+  'Mumbai Suburban',
+  'Nagpur',
+  'Nanded',
+  'Nandurbar',
+  'Nashik',
+  'Palghar',
+  'Parbhani',
+  'Pune',
+  'Raigad',
+  'Ratnagiri',
+  'Sangli',
+  'Satara',
+  'Sindhudurg',
+  'Solapur',
+  'Thane',
+  'Wardha',
+  'Washim',
+  'Yavatmal',
+];
+
+const translations = {
+  en: {
+    dashboard: 'Dashboard',
+    studentNavigator: 'Student Career Navigator',
+    settings: 'Settings',
+    location: 'Location',
+    language: 'Language',
+    home: 'Home',
+    back: 'Back',
+    forward: 'Forward',
+    notifications: 'Notifications',
+    profile: 'Profile',
+    myProgress: 'My progress',
+    exploreOpportunities: 'Explore opportunities',
+    refreshRecommendations: 'Refresh recommendations',
+    recommendationsRefreshed: 'Recommendations refreshed',
+    openCareerNavigator: 'Open career navigator',
+    viewSkillGaps: 'View skill gaps',
+    saved: 'Saved',
+    save: 'Save',
+    explorePath: 'Explore path',
+    browseCourses: 'Browse courses',
+    skillGaps: 'Skill gaps',
+    locationUpdated: 'District data updated',
+  },
+  hi: {
+    dashboard: 'डैशबोर्ड',
+    studentNavigator: 'छात्र करियर नेविगेटर',
+    settings: 'सेटिंग्स',
+    location: 'स्थान',
+    language: 'भाषा',
+    home: 'होम',
+    back: 'पीछे',
+    forward: 'आगे',
+    notifications: 'सूचनाएं',
+    profile: 'प्रोफ़ाइल',
+    myProgress: 'मेरी प्रगति',
+    exploreOpportunities: 'अवसर खोजें',
+    refreshRecommendations: 'सुझाव रीफ्रेश करें',
+    recommendationsRefreshed: 'सुझाव रीफ्रेश हो गए',
+    openCareerNavigator: 'करियर नेविगेटर खोलें',
+    viewSkillGaps: 'कौशल अंतर देखें',
+    saved: 'सहेजा गया',
+    save: 'सहेजें',
+    explorePath: 'रास्ता देखें',
+    browseCourses: 'कोर्स देखें',
+    skillGaps: 'कौशल अंतर',
+    locationUpdated: 'जिले का डेटा अपडेट हुआ',
+  },
+  mr: {
+    dashboard: 'डॅशबोर्ड',
+    studentNavigator: 'विद्यार्थी करिअर नेव्हिगेटर',
+    settings: 'सेटिंग्ज',
+    location: 'स्थान',
+    language: 'भाषा',
+    home: 'होम',
+    back: 'मागे',
+    forward: 'पुढे',
+    notifications: 'सूचना',
+    profile: 'प्रोफाइल',
+    myProgress: 'माझी प्रगती',
+    exploreOpportunities: 'संधी शोधा',
+    refreshRecommendations: 'शिफारसी रिफ्रेश करा',
+    recommendationsRefreshed: 'शिफारसी रिफ्रेश झाल्या',
+    openCareerNavigator: 'करिअर नेव्हिगेटर उघडा',
+    viewSkillGaps: 'कौशल्यातील अंतर पहा',
+    saved: 'जतन केले',
+    save: 'जतन करा',
+    explorePath: 'मार्ग पहा',
+    browseCourses: 'कोर्स पहा',
+    skillGaps: 'कौशल्यातील अंतर',
+    locationUpdated: 'जिल्ह्याचा डेटा अपडेट झाला',
+  },
+} as const;
+
+type TranslationKey = keyof typeof translations.en;
+type AppSettings = {
+  language: Language;
+  setLanguage: (language: Language) => void;
+  district: string;
+  setDistrict: (district: string) => void;
+  districtLoading: boolean;
+};
+const AppSettingsContext = createContext<AppSettings | null>(null);
+
+function useAppSettings() {
+  const settings = useContext(AppSettingsContext);
+  if (!settings) throw new Error('App settings are not available');
+  return settings;
+}
+
+function translate(language: Language, key: TranslationKey) {
+  return translations[language][key] ?? translations.en[key];
+}
+
+function getNavLabel(item: NavItem, language: Language) {
+  if (item.href === '/dashboard') return translate(language, 'dashboard');
+  if (item.href === '/career-navigator') return translate(language, 'studentNavigator');
+  if (item.href === '/skill-gaps') return translate(language, 'skillGaps');
+  if (item.href === '/settings') return translate(language, 'settings');
+  return item.label;
+}
+
 const nav: NavItem[] = [
   { label: 'Overview', href: '/dashboard', icon: LayoutDashboard, group: 'Decision room' },
   { label: 'Labour market', href: '/labour-market', icon: TrendingUp },
@@ -91,13 +242,9 @@ const nav: NavItem[] = [
 ];
 
 const studentNav: NavItem[] = [
-  { label: 'My dashboard', href: '/dashboard', icon: LayoutDashboard, group: 'My progress' },
-  { label: 'Career navigator', href: '/career-navigator', icon: Sparkles, group: 'My progress' },
-  { label: 'Skill gaps', href: '/skill-gaps', icon: Network, group: 'My progress' },
-  { label: 'Course alignment', href: '/course-alignment', icon: BookOpen, group: 'Explore opportunities' },
-  { label: 'Labour market', href: '/labour-market', icon: TrendingUp, group: 'Explore opportunities' },
-  { label: 'Reports', href: '/reports', icon: FileBarChart, group: 'Workspace' },
-  { label: 'Settings', href: '/settings', icon: Settings, group: 'Workspace' },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, group: 'Student' },
+  { label: 'Student Career Navigator', href: '/career-navigator', icon: Sparkles, group: 'Student' },
+  { label: 'Settings', href: '/settings', icon: Settings, group: 'Student' },
 ];
 
 const districtData = [
@@ -207,13 +354,10 @@ function Welcome({ onSelect }: { onSelect: (role: Role) => void }) {
 
 function Sidebar({ role, collapsed, setCollapsed, onNavigate }: { role: Role; collapsed: boolean; setCollapsed: (value: boolean) => void; onNavigate?: () => void }) {
   const [location] = useLocation();
+  const { language } = useAppSettings();
   const roleLabel = roles.find(r => r.id === role)?.title ?? 'Stakeholder';
   const groups = role === 'student'
-    ? [
-        { label: 'My progress', items: studentNav.filter(item => item.group === 'My progress') },
-        { label: 'Explore opportunities', items: studentNav.filter(item => item.group === 'Explore opportunities') },
-        { label: 'Workspace', items: studentNav.filter(item => item.group === 'Workspace') },
-      ]
+    ? [{ label: '', items: studentNav }]
     : [
         { label: 'Decision room', items: nav.filter(item => item.group === 'Decision room' || (!item.group && ['Labour market', 'Skill gaps', 'District planning'].includes(item.label))) },
         { label: 'Action studio', items: nav.filter(item => item.group === 'Action studio' || (!item.group && ['Career navigator', 'Employer demand'].includes(item.label))) },
@@ -227,7 +371,7 @@ function Sidebar({ role, collapsed, setCollapsed, onNavigate }: { role: Role; co
       </div>
       <div className={cn('border-b border-sidebar-border px-3 py-4', collapsed && 'px-2')}><div className={cn('flex items-center gap-3 rounded-xl bg-sidebar-accent px-3 py-2.5', collapsed && 'justify-center px-0')}><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground">{roleLabel.charAt(0)}</span>{!collapsed && <div className="min-w-0"><p className="truncate text-xs font-semibold">{roleLabel}</p><p className="text-[10px] text-sidebar-foreground/55">Preview workspace</p></div>}</div></div>
        <nav className="flex-1 overflow-y-auto px-3 py-4">
-         {groups.map(group => <div key={group.label} className="mb-5">{!collapsed && <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-data text-sidebar-foreground/40">{group.label}</p>}{group.items.map(item => { const active = location === item.href; return <Link key={item.href} href={item.href} onClick={onNavigate} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`} className={cn('group mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors', active ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground', collapsed && 'justify-center px-0')}><item.icon size={17} strokeWidth={active ? 2.4 : 1.8} />{!collapsed && <span>{item.label}</span>}{!collapsed && active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-current" />}</Link>; })}</div>)}
+          {groups.map(group => <div key={group.label || 'student-navigation'} className="mb-5">{!collapsed && group.label && <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-data text-sidebar-foreground/40">{group.label}</p>}{group.items.map(item => { const active = location === item.href; return <Link key={item.href} href={item.href} onClick={onNavigate} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`} className={cn('group mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors', active ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground', collapsed && 'justify-center px-0')}><item.icon size={17} strokeWidth={active ? 2.4 : 1.8} />{!collapsed && <span>{role === 'student' ? getNavLabel(item, language) : item.label}</span>}{!collapsed && active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-current" />}</Link>; })}</div>)}
       </nav>
       {!collapsed && <div className="m-3 rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-data text-sidebar-foreground/60"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Data status</div><p className="mt-2 text-xs leading-5 text-sidebar-foreground/70">Local preview data is current to Q4 FY25.</p></div>}
       <div className="border-t border-sidebar-border p-3"><button type="button" data-testid="button-help" className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground', collapsed && 'justify-center px-0')}><CircleHelp size={17} />{!collapsed && <span>Need a hand?</span>}</button></div>
@@ -324,17 +468,38 @@ function ProfileDrawer({ profile, onClose, onSave }: { profile: ProfileDetails; 
   );
 }
 
+function LocationLanguageControls() {
+  const { language, setLanguage, district, setDistrict, districtLoading } = useAppSettings();
+  return <div className="flex items-center gap-1.5" aria-label="Workspace preferences">
+    <label className="flex items-center gap-1 rounded-lg border border-border bg-card px-1.5 py-1.5 text-muted-foreground" title={translate(language, 'location')}>
+      <MapPin size={13} />
+      <select value={district} onChange={event => setDistrict(event.target.value)} disabled={districtLoading} aria-label={translate(language, 'location')} className="max-w-[78px] bg-transparent text-[10px] font-semibold text-foreground outline-none sm:max-w-[126px] sm:text-xs">
+        {maharashtraDistricts.map(item => <option key={item} value={item}>{item}</option>)}
+      </select>
+    </label>
+    <label className="flex items-center gap-1 rounded-lg border border-border bg-card px-1.5 py-1.5 text-muted-foreground" title={translate(language, 'language')}>
+      <Languages size={13} />
+      <select value={language} onChange={event => setLanguage(event.target.value as Language)} aria-label={translate(language, 'language')} className="max-w-[66px] bg-transparent text-[10px] font-semibold text-foreground outline-none sm:max-w-[86px] sm:text-xs">
+        {languages.map(item => <option key={item.id} value={item.id}>{item.nativeLabel}</option>)}
+      </select>
+    </label>
+    {districtLoading && <span className="hidden text-[10px] font-semibold text-primary sm:inline">{translate(language, 'locationUpdated')}…</span>}
+  </div>;
+}
+
 function Topbar({ role, onMenu, notificationsOpen, onNotifications, onProfile }: { role: Role; onMenu: () => void; notificationsOpen: boolean; onNotifications: () => void; onProfile: () => void }) {
   const [location, setLocation] = useLocation();
+  const { language } = useAppSettings();
   const current = (role === 'student' ? studentNav : nav).find(item => item.href === location)?.label ?? 'Overview';
   const roleLabel = roles.find(r => r.id === role)?.title ?? 'Stakeholder';
-  const goBack = () => {
-    window.history.back();
+  const flow = role === 'student' ? ['/dashboard', '/career-navigator', '/skill-gaps', '/settings'] : nav.map(item => item.href);
+  const moveInFlow = (direction: -1 | 1) => {
+    const index = flow.indexOf(location);
+    const next = flow[index + direction];
+    if (next) setLocation(next);
   };
-  const goForward = () => {
-    window.history.forward();
-  };
-  return <header className="relative sticky top-0 z-30 flex h-[78px] items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><button type="button" data-testid="button-open-menu" onClick={onMenu} className="rounded-lg p-2 text-muted-foreground hover:bg-muted md:hidden"><Menu size={20} /></button><div><p className="text-[10px] font-bold uppercase tracking-data text-muted-foreground">Maharashtra / {roleLabel}</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">{current}</h2></div></div><div className="flex items-center gap-1.5 sm:gap-3"><div className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground lg:flex"><Search size={14} /><span>Search signals</span><kbd className="ml-6 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘ K</kbd></div><div className="flex items-center rounded-xl border border-border bg-card p-0.5"><button type="button" data-testid="button-home" aria-label="Return to landing page" title="Landing page" onClick={() => setLocation('/')} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><House size={16} /></button><button type="button" data-testid="button-history-back" aria-label="Go back" title="Back" onClick={goBack} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ArrowLeft size={16} /></button><button type="button" data-testid="button-history-forward" aria-label="Go forward" title="Forward" onClick={goForward} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ArrowRight size={16} /></button></div><button type="button" data-testid="button-notifications" aria-label="Open notifications" aria-expanded={notificationsOpen} onClick={onNotifications} className={cn('relative rounded-xl p-2.5 text-muted-foreground hover:bg-muted', notificationsOpen && 'bg-muted text-foreground')}><Bell size={18} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#e56d52]" /></button><div className="hidden h-7 w-px bg-border sm:block" /><button type="button" data-testid="button-profile" aria-label="Open profile" onClick={onProfile} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2e8b78] text-xs font-bold text-white transition-transform hover:scale-105">AK</button></div>{notificationsOpen && <NotificationPopover onClose={onNotifications} />}</header>;
+  const pageLabel = role === 'student' ? getNavLabel((studentNav.find(item => item.href === location) ?? studentNav[0]), language) : current;
+  return <header className="relative sticky top-0 z-30 flex min-h-[78px] items-center justify-between gap-2 border-b border-border bg-background/90 px-3 backdrop-blur-md sm:px-8"><div className="flex min-w-0 items-center gap-2"><button type="button" data-testid="button-open-menu" onClick={onMenu} className="rounded-lg p-2 text-muted-foreground hover:bg-muted md:hidden"><Menu size={20} /></button><div className="min-w-0"><p className="truncate text-[9px] font-bold uppercase tracking-data text-muted-foreground">Maharashtra / {roleLabel}</p><h2 className="truncate text-base font-bold tracking-tight text-foreground sm:text-lg">{pageLabel}</h2></div></div><div className="flex shrink-0 items-center gap-1 sm:gap-3"><div className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground lg:flex"><Search size={14} /><span>Search signals</span><kbd className="ml-6 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘ K</kbd></div><LocationLanguageControls /><div className="flex items-center gap-1"><button type="button" data-testid="button-home" aria-label={translate(language, 'home')} title={translate(language, 'home')} onClick={() => setLocation('/')} className="rounded-lg border border-border bg-card p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><House size={16} /></button><div className="flex items-center rounded-lg border border-border bg-card p-0.5"><button type="button" data-testid="button-history-back" aria-label={translate(language, 'back')} title={translate(language, 'back')} onClick={() => moveInFlow(-1)} className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ArrowLeft size={16} /></button><button type="button" data-testid="button-history-forward" aria-label={translate(language, 'forward')} title={translate(language, 'forward')} onClick={() => moveInFlow(1)} className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ArrowRight size={16} /></button></div></div><button type="button" data-testid="button-notifications" aria-label={translate(language, 'notifications')} aria-expanded={notificationsOpen} onClick={onNotifications} className={cn('relative rounded-xl p-2 text-muted-foreground hover:bg-muted sm:p-2.5', notificationsOpen && 'bg-muted text-foreground')}><Bell size={18} /><span className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-[#e56d52]" /></button><div className="hidden h-7 w-px bg-border sm:block" /><button type="button" data-testid="button-profile" aria-label={translate(language, 'profile')} onClick={onProfile} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2e8b78] text-[10px] font-bold text-white transition-transform hover:scale-105 sm:h-9 sm:w-9 sm:text-xs">AK</button></div>{notificationsOpen && <NotificationPopover onClose={onNotifications} />}</header>;
 }
 
 function Shell({ children, role, setRole }: { children: ReactNode; role: Role; setRole: (role: Role) => void }) {
@@ -363,7 +528,7 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
 }
 
 function FilterStrip({ timeframe, setTimeframe, district, setDistrict }: { timeframe: string; setTimeframe: (value: string) => void; district: string; setDistrict: (value: string) => void }) {
-  return <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-2"><div className="flex items-center gap-2 px-2 text-xs font-semibold text-muted-foreground"><Filter size={14} /> View as</div><select value={timeframe} onChange={e => setTimeframe(e.target.value)} data-testid="select-timeframe" className="rounded-lg border-0 bg-muted px-3 py-2 text-xs font-semibold text-foreground outline-none"><option>Last 12 months</option><option>Last 6 months</option><option>FY 2024–25</option></select><select value={district} onChange={e => setDistrict(e.target.value)} data-testid="select-district" className="rounded-lg border-0 bg-muted px-3 py-2 text-xs font-semibold text-foreground outline-none"><option>All Maharashtra</option><option>Pune</option><option>Thane</option><option>Nashik</option><option>Nagpur</option></select><span className="ml-auto hidden items-center gap-1 px-3 text-[11px] text-muted-foreground sm:flex"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Updated 18 min ago</span></div>;
+  return <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-2"><div className="flex items-center gap-2 px-2 text-xs font-semibold text-muted-foreground"><Filter size={14} /> View as</div><select value={timeframe} onChange={e => setTimeframe(e.target.value)} data-testid="select-timeframe" className="rounded-lg border-0 bg-muted px-3 py-2 text-xs font-semibold text-foreground outline-none"><option>Last 12 months</option><option>Last 6 months</option><option>FY 2024–25</option></select><select value={district} onChange={e => setDistrict(e.target.value)} data-testid="select-district" className="max-w-[210px] rounded-lg border-0 bg-muted px-3 py-2 text-xs font-semibold text-foreground outline-none">{maharashtraDistricts.map(item => <option key={item} value={item}>{item}</option>)}</select><span className="ml-auto hidden items-center gap-1 px-3 text-[11px] text-muted-foreground sm:flex"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Updated 18 min ago</span></div>;
 }
 
 function StudentDashboard() {
@@ -387,6 +552,51 @@ function StudentDashboard() {
     localStorage.setItem('skillsync-student-saved-paths', JSON.stringify(next));
   };
   return <><PageIntro eyebrow="My progress" title="Your next move starts here." description="Use Maharashtra demand signals to choose a direction, build the right skills, and find a course that moves you closer to work." action={<button type="button" data-testid="button-refresh-recommendations" onClick={() => setRefreshed(true)} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-semibold text-foreground hover:bg-muted"><RefreshCw size={14} /> {refreshed ? 'Recommendations refreshed' : 'Refresh recommendations'}</button>} /><div className="grid gap-6 lg:grid-cols-[.72fr_1.28fr]"><Card className="bg-[#173746] p-6 text-[#f4f0e5]"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e1a329] text-[#173746]"><Target size={20} /></div><p className="mt-6 text-xl font-bold">Start with what interests you.</p><p className="mt-2 text-sm leading-6 text-[#b9cbc8]">We will connect your curiosity to growing sectors, useful courses, and real roles near you.</p><label className="mt-8 block text-[10px] font-bold uppercase tracking-data text-[#b9cbc8]" htmlFor="student-interest">I am curious about</label><select id="student-interest" value={interest} onChange={event => setInterest(event.target.value)} data-testid="select-student-interest" className="mt-2 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm text-white outline-none"><option className="text-[#173746]">Technology & digital</option><option className="text-[#173746]">Machines & making</option><option className="text-[#173746]">Climate & energy</option><option className="text-[#173746]">People & healthcare</option></select><Link href="/career-navigator" data-testid="link-student-career-navigator" className="mt-6 flex items-center justify-between rounded-xl bg-[#f4f0e5] px-4 py-3 text-xs font-bold text-[#173746] hover:bg-white">Open career navigator <ArrowRight size={15} /></Link></Card><div><div className="mb-3 flex items-end justify-between gap-4"><div><p className="text-sm font-bold">Recommended paths</p><p className="mt-1 text-xs text-muted-foreground">Based on {interest.toLowerCase()} and current Maharashtra demand.</p></div><Link href="/skill-gaps" className="text-xs font-bold text-primary hover:underline">View skill gaps</Link></div><div className="space-y-3">{recommendations.map(path => { const isSaved = savedPaths.includes(path.title); return <Card key={path.title} className="p-4 transition-transform hover:-translate-y-0.5"><div className="flex items-start gap-3"><div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', path.tone === 'teal' ? 'bg-teal-100 text-teal-700' : path.tone === 'amber' ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700')}><Sparkles size={17} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-bold">{path.title}</p><Badge tone="green">{path.match}% match</Badge></div><p className="mt-1 text-xs leading-5 text-muted-foreground">{path.detail}</p></div><button type="button" data-testid={`button-save-student-path-${path.title.toLowerCase().replaceAll(' ', '-')}`} onClick={() => toggleSaved(path.title)} className={cn('rounded-lg px-2.5 py-2 text-[11px] font-bold transition-colors', isSaved ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground hover:text-foreground')}>{isSaved ? 'Saved' : 'Save'}</button></div><div className="mt-4 flex items-center justify-between border-t border-border pt-3"><span className="text-[11px] text-muted-foreground">Interest: {interest}</span><Link href={path.href} data-testid={`link-explore-student-path-${path.title.toLowerCase().replaceAll(' ', '-')}`} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">Explore path <ChevronRight size={14} /></Link></div></Card>; })}</div></div></div><Card className="mt-6 p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-bold">Your saved paths</p><p className="mt-1 text-xs text-muted-foreground">{savedPaths.length ? `${savedPaths.length} path${savedPaths.length === 1 ? '' : 's'} saved in this browser.` : 'Save a path above to keep it handy while you compare options.'}</p></div><Link href="/course-alignment" data-testid="link-student-courses" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">Browse courses <BookOpen size={14} /></Link></div></Card></>;
+}
+
+function StudentDashboardLocalized() {
+  const { language, district } = useAppSettings();
+  const [interest, setInterest] = useState('Technology & digital');
+  const [saved, setSaved] = useState<string[]>([]);
+  const [refreshed, setRefreshed] = useState(false);
+  const paths = ['Industrial IoT technician', 'Data operations associate', 'Solar PV design assistant'];
+  const toggleSaved = (path: string) => setSaved(current => current.includes(path) ? current.filter(item => item !== path) : [...current, path]);
+  return <><PageIntro eyebrow={translate(language, 'myProgress')} title={language === 'en' ? 'Your next move starts here.' : language === 'hi' ? 'आपका अगला कदम यहां से शुरू होता है।' : 'तुमची पुढची वाटचाल इथून सुरू होते.'} description={language === 'en' ? `Explore skills and opportunities near ${district}.` : language === 'hi' ? `${district} के पास कौशल और अवसर खोजें।` : `${district} जवळील कौशल्ये आणि संधी शोधा.`} action={<button type="button" data-testid="button-refresh-recommendations" onClick={() => setRefreshed(true)} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-semibold text-foreground hover:bg-muted"><RefreshCw size={14} /> {refreshed ? translate(language, 'recommendationsRefreshed') : translate(language, 'refreshRecommendations')}</button>} /><div className="grid gap-6 lg:grid-cols-[.72fr_1.28fr]"><Card className="bg-[#173746] p-6 text-[#f4f0e5]"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e1a329] text-[#173746]"><Target size={20} /></div><p className="mt-6 text-xl font-bold">{language === 'en' ? 'Start with what interests you.' : language === 'hi' ? 'अपनी रुचि से शुरुआत करें।' : 'तुमच्या आवडीपासून सुरुवात करा.'}</p><p className="mt-2 text-sm leading-6 text-[#b9cbc8]">{language === 'en' ? 'We connect your curiosity to useful courses and real roles.' : language === 'hi' ? 'हम आपकी रुचि को उपयोगी कोर्स और वास्तविक भूमिकाओं से जोड़ते हैं।' : 'तुमच्या आवडीला उपयुक्त कोर्स आणि प्रत्यक्ष भूमिकांशी जोडतो.'}</p><label className="mt-8 block text-[10px] font-bold uppercase tracking-data text-[#b9cbc8]" htmlFor="student-interest-localized">{language === 'en' ? 'I am curious about' : language === 'hi' ? 'मेरी रुचि है' : 'मला याबद्दल उत्सुकता आहे'}</label><select id="student-interest-localized" value={interest} onChange={event => setInterest(event.target.value)} className="mt-2 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm text-white outline-none"><option className="text-[#173746]">Technology & digital</option><option className="text-[#173746]">Machines & making</option><option className="text-[#173746]">Climate & energy</option><option className="text-[#173746]">People & healthcare</option></select><Link href="/career-navigator" className="mt-6 flex items-center justify-between rounded-xl bg-[#f4f0e5] px-4 py-3 text-xs font-bold text-[#173746] hover:bg-white">{translate(language, 'openCareerNavigator')} <ArrowRight size={15} /></Link></Card><div><div className="mb-3 flex items-end justify-between gap-4"><div><p className="text-sm font-bold">{language === 'en' ? 'Recommended paths' : language === 'hi' ? 'अनुशंसित रास्ते' : 'शिफारस केलेले मार्ग'}</p><p className="mt-1 text-xs text-muted-foreground">{district} · {interest}</p></div><Link href="/skill-gaps" className="text-xs font-bold text-primary hover:underline">{translate(language, 'viewSkillGaps')}</Link></div><div className="space-y-3">{paths.map((path, index) => <Card key={path} className="p-4"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-100 text-teal-700"><Sparkles size={17} /></div><div className="min-w-0 flex-1"><p className="text-sm font-bold">{path}</p><p className="mt-1 text-xs text-muted-foreground">{[92, 86, 78][index]}% match · {district}</p></div><button type="button" onClick={() => toggleSaved(path)} className={cn('rounded-lg px-2.5 py-2 text-[11px] font-bold', saved.includes(path) ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground')}>{saved.includes(path) ? translate(language, 'saved') : translate(language, 'save')}</button></div><div className="mt-3 flex justify-end border-t border-border pt-3"><Link href="/career-navigator" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">{translate(language, 'explorePath')} <ChevronRight size={14} /></Link></div></Card>)}</div></div></div><Card className="mt-6 p-5"><div className="flex flex-wrap items-center justify-between gap-4"><p className="text-sm font-bold">{saved.length ? `${saved.length} ${translate(language, 'saved')}` : translate(language, 'browseCourses')}</p><Link href="/course-alignment" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">{translate(language, 'browseCourses')} <BookOpen size={14} /></Link></div></Card></>;
+}
+
+function StudentCareerNavigator() {
+  const { language, district } = useAppSettings();
+  const [interest, setInterest] = useState('Technology & digital');
+  const paths = [
+    { title: 'Industrial IoT technician', match: 92, pay: '₹34,000' },
+    { title: 'Data operations associate', match: 86, pay: '₹28,500' },
+    { title: 'Solar PV design assistant', match: 78, pay: '₹31,200' },
+  ];
+  return <><PageIntro eyebrow={translate(language, 'studentNavigator')} title={language === 'en' ? 'Find your next opportunity.' : language === 'hi' ? 'अपना अगला अवसर खोजें।' : 'तुमची पुढची संधी शोधा.'} description={`${district} · ${interest}`} /><div className="grid gap-6 lg:grid-cols-[.7fr_1.3fr]"><Card className="bg-[#173746] p-6 text-[#f4f0e5]"><Sparkles className="text-[#e1a329]" size={22} /><p className="mt-6 text-xl font-bold">{language === 'en' ? 'Choose an interest.' : language === 'hi' ? 'अपनी रुचि चुनें।' : 'तुमची आवड निवडा.'}</p><select value={interest} onChange={event => setInterest(event.target.value)} className="mt-6 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm text-white outline-none"><option className="text-[#173746]">Technology & digital</option><option className="text-[#173746]">Machines & making</option><option className="text-[#173746]">Climate & energy</option><option className="text-[#173746]">People & healthcare</option></select><Link href="/skill-gaps" className="mt-5 flex items-center justify-between rounded-xl bg-[#f4f0e5] px-4 py-3 text-xs font-bold text-[#173746]">{translate(language, 'viewSkillGaps')} <ArrowRight size={15} /></Link></Card><div className="space-y-3">{paths.map(path => <Card key={path.title} className="p-5"><div className="flex items-center gap-4"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 font-mono text-sm font-bold text-amber-700">{path.match}%</div><div className="min-w-0 flex-1"><p className="text-sm font-bold">{path.title}</p><p className="mt-1 text-xs text-muted-foreground">{interest} · {district} · Median {path.pay}</p></div><Link href="/skill-gaps" className="rounded-xl border border-border p-2.5 text-muted-foreground hover:border-primary hover:text-primary" aria-label={translate(language, 'viewSkillGaps')}><ChevronRight size={17} /></Link></div><Link href="/course-alignment" className="mt-4 flex items-center gap-1 border-t border-border pt-3 text-xs font-bold text-primary hover:underline">{translate(language, 'browseCourses')} <BookOpen size={13} /></Link></Card>)}</div></div></>;
+}
+
+function StudentSkillGapsLocalized() {
+  const { language, district } = useAppSettings();
+  const [selected, setSelected] = useState('All skills');
+  const gaps = [
+    { skill: 'Digital tools', demand: 88, readiness: 53 },
+    { skill: 'Battery management systems', demand: 81, readiness: 29 },
+    { skill: 'Communication', demand: 74, readiness: 58 },
+    { skill: 'Solar design', demand: 69, readiness: 38 },
+  ];
+  const filters = ['All skills', 'Technology', 'Machines', 'People', 'Climate'];
+  return <><PageIntro eyebrow={translate(language, 'skillGaps')} title={language === 'en' ? 'Know what to build next.' : language === 'hi' ? 'जानें कि आगे क्या बनाना है।' : 'पुढे काय विकसित करायचे ते जाणून घ्या.'} description={`${district} · ${language === 'en' ? 'Compare employer demand with your readiness.' : language === 'hi' ? 'नियोक्ता की मांग और अपनी तैयारी की तुलना करें।' : 'नियोक्त्यांची मागणी आणि तुमची तयारी यांची तुलना करा.'}`} /><div className="mb-6 flex flex-wrap gap-2">{filters.map(filter => <button type="button" key={filter} onClick={() => setSelected(filter)} className={cn('rounded-full border px-4 py-2 text-xs font-semibold', selected === filter ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted')}>{filter}</button>)}</div><div className="space-y-3">{gaps.map(item => { const gap = item.demand - item.readiness; return <Card key={item.skill} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold">{item.skill}</p><p className="mt-1 text-xs text-muted-foreground">{language === 'en' ? 'Recommended next step: take a practical bridge course.' : language === 'hi' ? 'अगला कदम: एक व्यावहारिक ब्रिज कोर्स करें।' : 'पुढील पाऊल: व्यावहारिक ब्रिज कोर्स घ्या.'}</p></div><Badge tone="coral">{gap} pt gap</Badge></div><div className="mt-5"><div className="mb-2 flex justify-between text-[10px] uppercase tracking-data text-muted-foreground"><span>{language === 'en' ? 'Your readiness' : language === 'hi' ? 'आपकी तैयारी' : 'तुमची तयारी'} · {item.readiness}%</span><span>{language === 'en' ? 'Employer demand' : language === 'hi' ? 'नियोक्ता की मांग' : 'नियोक्त्यांची मागणी'} · {item.demand}%</span></div><div className="relative h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#2e8b78]" style={{ width: `${item.readiness}%` }} /><div className="absolute inset-y-0 border-r-2 border-[#173746]" style={{ left: `${item.demand}%` }} /></div></div><Link href="/course-alignment" className="mt-4 flex w-fit items-center gap-1 text-xs font-bold text-primary hover:underline">{translate(language, 'browseCourses')} <ChevronRight size={14} /></Link></Card>; })}</div></>;
+}
+
+function StudentSettingsLocalized({ role, setRole }: { role: Role; setRole: (role: Role) => void }) {
+  const { language, district } = useAppSettings();
+  const copy = language === 'hi'
+    ? { eyebrow: 'सेटिंग्स', title: 'अपना छात्र कार्यक्षेत्र', description: 'अपनी भाषा, जिला और कार्यक्षेत्र चुनें।', role: 'कार्य दृष्टिकोण', district: 'सक्रिय जिला', saved: 'स्थानीय रूप से सेव' }
+    : language === 'mr'
+      ? { eyebrow: 'सेटिंग्ज', title: 'तुमचे विद्यार्थी कार्यक्षेत्र', description: 'तुमची भाषा, जिल्हा आणि कार्यदृष्टी निवडा.', role: 'कार्यदृष्टी', district: 'सक्रिय जिल्हा', saved: 'स्थानिक पातळीवर जतन केले' }
+      : { eyebrow: 'Settings', title: 'Your student workspace', description: 'Choose your language, district, and working perspective.', role: 'Working perspective', district: 'Active district', saved: 'Saved locally' };
+  const [saved, setSaved] = useState(false);
+  return <><PageIntro eyebrow={copy.eyebrow} title={copy.title} description={copy.description} /><Card className="max-w-2xl p-5 sm:p-6"><label className="block text-xs font-semibold">{copy.role}<select value={role} onChange={event => { setRole(event.target.value as Role); setSaved(true); }} className="mt-2 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none">{roles.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label><div className="mt-5 rounded-xl border border-border bg-muted/50 p-4"><p className="text-[10px] font-bold uppercase tracking-data text-muted-foreground">{copy.district}</p><p className="mt-1 text-sm font-semibold">{district}</p><p className="mt-2 text-xs text-muted-foreground">{language === 'en' ? 'Use the location selector in the top bar to change district data.' : language === 'hi' ? 'जिले का डेटा बदलने के लिए ऊपर स्थान चयनकर्ता का उपयोग करें।' : 'जिल्ह्याचा डेटा बदलण्यासाठी वरचा स्थान निवडक वापरा.'}</p></div><button type="button" onClick={() => setSaved(true)} className="mt-6 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground">{saved ? copy.saved : language === 'en' ? 'Save changes' : language === 'hi' ? 'बदलाव सेव करें' : 'बदल जतन करा'}</button></Card></>;
 }
 
 function StudentLabourMarket() {
@@ -421,7 +631,7 @@ function StudentSkillGaps() {
 
 function Dashboard({ role }: { role: Role }) {
   const [timeframe, setTimeframe] = useState('Last 12 months');
-  const [district, setDistrict] = useState('All Maharashtra');
+  const { district, setDistrict } = useAppSettings();
   const multiplier = district === 'All Maharashtra' ? 1 : district === 'Pune' ? .81 : district === 'Thane' ? .69 : district === 'Nashik' ? .52 : .58;
   const jobs = Math.round(284600 * multiplier).toLocaleString('en-IN');
   const priorityItems = [
@@ -486,15 +696,15 @@ function Workspace({ role, setRole }: { role: Role; setRole: (role: Role) => voi
   const [location] = useLocation();
   const page = useMemo(() => {
     switch (location) {
-      case '/dashboard': return role === 'student' ? <StudentDashboard /> : <Dashboard role={role} />;
+      case '/dashboard': return role === 'student' ? <StudentDashboardLocalized /> : <Dashboard role={role} />;
       case '/labour-market': return role === 'student' ? <StudentLabourMarket /> : <LabourMarket />;
-      case '/skill-gaps': return role === 'student' ? <StudentSkillGaps /> : <SkillGaps />;
+      case '/skill-gaps': return role === 'student' ? <StudentSkillGapsLocalized /> : <SkillGaps />;
       case '/district-planning': return <DistrictPlanning />;
       case '/course-alignment': return <CourseAlignment />;
-      case '/career-navigator': return <CareerNavigator />;
+      case '/career-navigator': return role === 'student' ? <StudentCareerNavigator /> : <CareerNavigator />;
       case '/employer-demand': return <EmployerDemand />;
       case '/reports': return <Reports />;
-      case '/settings': return <SettingsPage role={role} setRole={setRole} />;
+      case '/settings': return role === 'student' ? <StudentSettingsLocalized role={role} setRole={setRole} /> : <SettingsPage role={role} setRole={setRole} />;
       default: return <NotFound />;
     }
   }, [location, role, setRole]);
@@ -504,10 +714,20 @@ function Workspace({ role, setRole }: { role: Role; setRole: (role: Role) => voi
 function App() {
   const [location, setLocation] = useLocation();
   const [role, setRoleState] = useState<Role>(() => (localStorage.getItem('skillsync-role') as Role) || 'government');
+  const [language, setLanguageState] = useState<Language>(() => (localStorage.getItem('skillsync-language') as Language) || 'en');
+  const [district, setDistrictState] = useState(() => localStorage.getItem('skillsync-district') || 'All Maharashtra');
+  const [districtLoading, setDistrictLoading] = useState(false);
   const isWelcome = location === '/';
   const setRole = (nextRole: Role) => { setRoleState(nextRole); localStorage.setItem('skillsync-role', nextRole); };
-  if (isWelcome) return <Welcome onSelect={nextRole => { setRole(nextRole); setLocation('/dashboard'); }} />;
-  return <QueryClientProvider client={queryClient}><TooltipProvider><ErrorBoundary resetKey={location}><Workspace role={role} setRole={setRole} /></ErrorBoundary><Toaster /></TooltipProvider></QueryClientProvider>;
+  const setLanguage = (nextLanguage: Language) => { setLanguageState(nextLanguage); localStorage.setItem('skillsync-language', nextLanguage); };
+  const setDistrict = (nextDistrict: string) => {
+    setDistrictLoading(true);
+    setDistrictState(nextDistrict);
+    localStorage.setItem('skillsync-district', nextDistrict);
+    window.setTimeout(() => setDistrictLoading(false), 250);
+  };
+  const settings = { language, setLanguage, district, setDistrict, districtLoading };
+  return <AppSettingsContext.Provider value={settings}>{isWelcome ? <Welcome onSelect={nextRole => { setRole(nextRole); setLocation('/dashboard'); }} /> : <QueryClientProvider client={queryClient}><TooltipProvider><ErrorBoundary resetKey={location}><Workspace role={role} setRole={setRole} /></ErrorBoundary><Toaster /></TooltipProvider></QueryClientProvider>}</AppSettingsContext.Provider>;
 }
 
 export default App;
