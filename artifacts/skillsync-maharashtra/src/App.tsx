@@ -29,6 +29,13 @@ import {
   Target,
   TrendingUp,
   Users,
+  UserRound,
+  Mail,
+  Phone,
+  Building2,
+  MapPin,
+  Pencil,
+  Save,
   X,
   Zap,
   type LucideIcon,
@@ -42,6 +49,24 @@ const queryClient = new QueryClient();
 
 type Role = 'government' | 'institute' | 'employer' | 'student';
 type NavItem = { label: string; href: string; icon: LucideIcon; group?: string };
+type Overlay = 'notifications' | 'profile' | null;
+type ProfileDetails = {
+  name: string;
+  email: string;
+  phone: string;
+  organization: string;
+  location: string;
+  role: Role;
+};
+
+const defaultProfile: ProfileDetails = {
+  name: 'Aniket Kulkarni',
+  email: 'aniket.kulkarni@skillsync.maha.gov.in',
+  phone: '+91 98765 43210',
+  organization: 'Department of Skill Development, Entrepreneurship & Innovation',
+  location: 'Pune, Maharashtra',
+  role: 'government',
+};
 
 const roles: { id: Role; title: string; description: string; icon: LucideIcon; accent: string }[] = [
   { id: 'government', title: 'Government & policy', description: 'Plan district skilling with evidence', icon: ShieldCheck, accent: 'amber' },
@@ -176,17 +201,121 @@ function Sidebar({ role, collapsed, setCollapsed, onNavigate }: { role: Role; co
   );
 }
 
-function Topbar({ role, onMenu }: { role: Role; onMenu: () => void }) {
+const notifications = [
+  { title: 'Nashik has a 31% solar skills gap', detail: 'District planning · 2h ago', href: '/district-planning', tone: 'amber' },
+  { title: '14 courses need a curriculum refresh', detail: 'Course alignment · Yesterday', href: '/course-alignment', tone: 'teal' },
+  { title: 'Pune demand rose in precision engineering', detail: 'Labour market · Monday', href: '/labour-market', tone: 'coral' },
+];
+
+function NotificationPopover({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="absolute right-4 top-[70px] z-50 w-[min(370px,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_20px_60px_-24px_rgba(23,55,70,.45)]">
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div>
+          <p className="text-sm font-bold text-foreground">Notifications</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">Signals that may need your attention</p>
+        </div>
+        <button type="button" aria-label="Close notifications" onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"><X size={16} /></button>
+      </div>
+      <div className="divide-y divide-border">
+        {notifications.map(item => (
+          <Link key={item.title} href={item.href} onClick={onClose} className="group flex gap-3 px-4 py-3 transition-colors hover:bg-muted">
+            <span className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', item.tone === 'amber' ? 'bg-amber-100 text-amber-700' : item.tone === 'teal' ? 'bg-teal-100 text-teal-700' : 'bg-orange-100 text-orange-700')}><Bell size={14} /></span>
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold leading-5 text-foreground">{item.title}</span>
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">{item.detail}</span>
+            </span>
+            <ChevronRight className="ml-auto mt-1 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-1" size={15} />
+          </Link>
+        ))}
+      </div>
+      <div className="border-t border-border bg-muted/40 px-4 py-3 text-[11px] text-muted-foreground">Preview notifications are based on local workspace signals.</div>
+    </div>
+  );
+}
+
+function ProfileDrawer({ profile, onClose, onSave }: { profile: ProfileDetails; onClose: () => void; onSave: (profile: ProfileDetails) => void }) {
+  const [draft, setDraft] = useState(profile);
+  const [editing, setEditing] = useState(false);
+  const roleLabel = roles.find(role => role.id === draft.role)?.title ?? 'Stakeholder';
+  const update = (field: keyof ProfileDetails, value: string) => setDraft(current => ({ ...current, [field]: value }));
+  const inputClass = 'mt-1.5 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm text-foreground outline-none ring-primary/30 transition focus:ring-2 disabled:cursor-default disabled:border-transparent disabled:bg-muted/60';
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-[#173746]/35" onClick={onClose}>
+      <aside role="dialog" aria-modal="true" aria-labelledby="profile-title" onClick={event => event.stopPropagation()} className="absolute right-0 top-0 flex h-full w-full max-w-[460px] flex-col border-l border-border bg-background shadow-[-20px_0_70px_-35px_rgba(23,55,70,.65)]">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4 sm:px-6">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-data text-primary">Account profile</p>
+            <h2 id="profile-title" className="mt-1 text-xl font-bold text-foreground">Your details</h2>
+          </div>
+          <button type="button" aria-label="Close profile" onClick={onClose} className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground"><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-6">
+          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#2e8b78] text-lg font-bold text-white">{draft.name.split(' ').map(part => part.charAt(0)).slice(0, 2).join('')}</div>
+            <div className="min-w-0">
+              <p className="truncate text-base font-bold text-foreground">{draft.name || 'Your name'}</p>
+              <p className="mt-1 truncate text-xs text-muted-foreground">{roleLabel}</p>
+            </div>
+            <Badge tone="green">Preview</Badge>
+          </div>
+
+          <div className="mt-6 space-y-4">
+            <label className="block text-xs font-semibold text-foreground">Full name<input value={draft.name} onChange={event => update('name', event.target.value)} disabled={!editing} className={inputClass} /></label>
+            <label className="block text-xs font-semibold text-foreground"><span className="flex items-center gap-1.5"><Mail size={13} className="text-muted-foreground" /> Email address</span><input type="email" value={draft.email} onChange={event => update('email', event.target.value)} disabled={!editing} className={inputClass} /></label>
+            <label className="block text-xs font-semibold text-foreground"><span className="flex items-center gap-1.5"><Phone size={13} className="text-muted-foreground" /> Phone number</span><input value={draft.phone} onChange={event => update('phone', event.target.value)} disabled={!editing} className={inputClass} /></label>
+            <label className="block text-xs font-semibold text-foreground"><span className="flex items-center gap-1.5"><Building2 size={13} className="text-muted-foreground" /> Organization</span><input value={draft.organization} onChange={event => update('organization', event.target.value)} disabled={!editing} className={inputClass} /></label>
+            <label className="block text-xs font-semibold text-foreground"><span className="flex items-center gap-1.5"><MapPin size={13} className="text-muted-foreground" /> Location</span><input value={draft.location} onChange={event => update('location', event.target.value)} disabled={!editing} className={inputClass} /></label>
+            <label className="block text-xs font-semibold text-foreground">Working perspective<select value={draft.role} onChange={event => update('role', event.target.value)} disabled={!editing} className={inputClass}>{roles.map(role => <option key={role.id} value={role.id}>{role.title}</option>)}</select></label>
+          </div>
+
+          <div className="mt-6 rounded-xl border border-border bg-muted/50 p-4">
+            <p className="text-[10px] font-bold uppercase tracking-data text-muted-foreground">Local preview account</p>
+            <p className="mt-2 text-xs leading-5 text-muted-foreground">Your changes are saved in this browser only. Authentication and cloud persistence are not configured for this preview.</p>
+          </div>
+        </div>
+        <div className="flex gap-2 border-t border-border bg-background px-5 py-4 sm:px-6">
+          {editing ? (
+            <>
+              <button type="button" onClick={() => { setDraft(profile); setEditing(false); }} className="flex-1 rounded-xl border border-border px-4 py-2.5 text-xs font-bold text-foreground hover:bg-muted">Cancel</button>
+              <button type="button" data-testid="button-save-profile" onClick={() => { onSave(draft); setEditing(false); }} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:brightness-110"><Save size={14} /> Save details</button>
+            </>
+          ) : (
+            <button type="button" data-testid="button-edit-profile" onClick={() => setEditing(true)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-bold text-primary-foreground hover:brightness-110"><Pencil size={14} /> Edit profile</button>
+          )}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function Topbar({ role, onMenu, notificationsOpen, onNotifications, onProfile }: { role: Role; onMenu: () => void; notificationsOpen: boolean; onNotifications: () => void; onProfile: () => void }) {
   const [location] = useLocation();
   const current = nav.find(item => item.href === location)?.label ?? 'Overview';
   const roleLabel = roles.find(r => r.id === role)?.title ?? 'Stakeholder';
-  return <header className="sticky top-0 z-30 flex h-[78px] items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><button type="button" data-testid="button-open-menu" onClick={onMenu} className="rounded-lg p-2 text-muted-foreground hover:bg-muted md:hidden"><Menu size={20} /></button><div><p className="text-[10px] font-bold uppercase tracking-data text-muted-foreground">Maharashtra / {roleLabel}</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">{current}</h2></div></div><div className="flex items-center gap-2 sm:gap-4"><div className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground lg:flex"><Search size={14} /><span>Search signals</span><kbd className="ml-6 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘ K</kbd></div><button type="button" data-testid="button-notifications" className="relative rounded-xl p-2.5 text-muted-foreground hover:bg-muted"><Bell size={18} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#e56d52]" /></button><div className="hidden h-7 w-px bg-border sm:block" /><div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2e8b78] text-xs font-bold text-white">AK</div></div></header>;
+  return <header className="relative sticky top-0 z-30 flex h-[78px] items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><button type="button" data-testid="button-open-menu" onClick={onMenu} className="rounded-lg p-2 text-muted-foreground hover:bg-muted md:hidden"><Menu size={20} /></button><div><p className="text-[10px] font-bold uppercase tracking-data text-muted-foreground">Maharashtra / {roleLabel}</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">{current}</h2></div></div><div className="flex items-center gap-2 sm:gap-4"><div className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground lg:flex"><Search size={14} /><span>Search signals</span><kbd className="ml-6 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘ K</kbd></div><button type="button" data-testid="button-notifications" aria-label="Open notifications" aria-expanded={notificationsOpen} onClick={onNotifications} className={cn('relative rounded-xl p-2.5 text-muted-foreground hover:bg-muted', notificationsOpen && 'bg-muted text-foreground')}><Bell size={18} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#e56d52]" /></button><div className="hidden h-7 w-px bg-border sm:block" /><button type="button" data-testid="button-profile" aria-label="Open profile" onClick={onProfile} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2e8b78] text-xs font-bold text-white transition-transform hover:scale-105">AK</button></div>{notificationsOpen && <NotificationPopover onClose={onNotifications} />}</header>;
 }
 
-function Shell({ children, role }: { children: ReactNode; role: Role }) {
+function Shell({ children, role, setRole }: { children: ReactNode; role: Role; setRole: (role: Role) => void }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  return <div className="min-h-[100dvh] bg-background"><div className={cn(mobileOpen ? 'block' : 'hidden', 'fixed inset-0 z-30 bg-[#173746]/35 md:hidden')} onClick={() => setMobileOpen(false)} /><div className={cn('md:block', mobileOpen ? 'block' : 'hidden')}><Sidebar role={role} collapsed={collapsed} setCollapsed={setCollapsed} onNavigate={() => setMobileOpen(false)} /></div><div className={cn('min-h-[100dvh] transition-[margin] duration-300', collapsed ? 'md:ml-[76px]' : 'md:ml-[248px]')}><Topbar role={role} onMenu={() => setMobileOpen(true)} /><main className="mx-auto max-w-[1540px] px-5 py-7 sm:px-8 lg:px-10">{children}</main></div></div>;
+  const [overlay, setOverlay] = useState<Overlay>(null);
+  const [profile, setProfile] = useState<ProfileDetails>(() => {
+    try {
+      const stored = localStorage.getItem('skillsync-profile');
+      return stored ? { ...defaultProfile, ...JSON.parse(stored), role } : { ...defaultProfile, role };
+    } catch {
+      return { ...defaultProfile, role };
+    }
+  });
+  const saveProfile = (nextProfile: ProfileDetails) => {
+    setProfile(nextProfile);
+    localStorage.setItem('skillsync-profile', JSON.stringify(nextProfile));
+    setRole(nextProfile.role);
+    setOverlay(null);
+  };
+  return <div className="min-h-[100dvh] bg-background"><div className={cn(mobileOpen ? 'block' : 'hidden', 'fixed inset-0 z-30 bg-[#173746]/35 md:hidden')} onClick={() => setMobileOpen(false)} /><div className={cn('md:block', mobileOpen ? 'block' : 'hidden')}><Sidebar role={role} collapsed={collapsed} setCollapsed={setCollapsed} onNavigate={() => setMobileOpen(false)} /></div><div className={cn('min-h-[100dvh] transition-[margin] duration-300', collapsed ? 'md:ml-[76px]' : 'md:ml-[248px]')}><Topbar role={role} onMenu={() => setMobileOpen(true)} notificationsOpen={overlay === 'notifications'} onNotifications={() => setOverlay(current => current === 'notifications' ? null : 'notifications')} onProfile={() => setOverlay('profile')} /><main className="mx-auto max-w-[1540px] px-5 py-7 sm:px-8 lg:px-10">{children}</main></div>{overlay === 'profile' && <ProfileDrawer profile={{ ...profile, role }} onClose={() => setOverlay(null)} onSave={saveProfile} />}</div>;
 }
 
 function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {
@@ -276,7 +405,7 @@ function Workspace({ role, setRole }: { role: Role; setRole: (role: Role) => voi
       default: return <NotFound />;
     }
   }, [location, role, setRole]);
-  return <Shell role={role}>{page}</Shell>;
+  return <Shell role={role} setRole={setRole}>{page}</Shell>;
 }
 
 function App() {
