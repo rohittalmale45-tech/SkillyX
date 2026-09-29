@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "SkillSync Maharashtra"
+description = "A previewable labour-market intelligence and skill-development decision-support app for Maharashtra, adapted from the provided project archive with a role-based dashboard and local API-backed analytics."
+version = "1.0.0"
+id = "artifacts/skillsync-maharashtra"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18177
+
+[services.development]
+run = "pnpm --filter @workspace/skillsync-maharashtra run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/skillsync-maharashtra", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/skillsync-maharashtra/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18177"
+BASE_PATH = "/"
