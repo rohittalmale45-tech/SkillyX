@@ -2,6 +2,8 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
   Activity,
+  ArrowLeft,
+  ArrowRight,
   ArrowUpRight,
   Bell,
   BookOpen,
@@ -13,6 +15,7 @@ import {
   FileBarChart,
   Filter,
   GraduationCap,
+  House,
   LayoutDashboard,
   Lightbulb,
   Map,
@@ -87,6 +90,16 @@ const nav: NavItem[] = [
   { label: 'Settings', href: '/settings', icon: Settings },
 ];
 
+const studentNav: NavItem[] = [
+  { label: 'My dashboard', href: '/dashboard', icon: LayoutDashboard, group: 'My progress' },
+  { label: 'Career navigator', href: '/career-navigator', icon: Sparkles, group: 'My progress' },
+  { label: 'Skill gaps', href: '/skill-gaps', icon: Network, group: 'My progress' },
+  { label: 'Course alignment', href: '/course-alignment', icon: BookOpen, group: 'Explore opportunities' },
+  { label: 'Labour market', href: '/labour-market', icon: TrendingUp, group: 'Explore opportunities' },
+  { label: 'Reports', href: '/reports', icon: FileBarChart, group: 'Workspace' },
+  { label: 'Settings', href: '/settings', icon: Settings, group: 'Workspace' },
+];
+
 const districtData = [
   { name: 'Pune', short: 'PN', demand: 84, learners: '1,24,800', gap: 18, trend: '+12.4%', color: 'bg-[#e1a329]' },
   { name: 'Thane', short: 'TH', demand: 77, learners: '98,420', gap: 24, trend: '+8.1%', color: 'bg-[#2e8b78]' },
@@ -104,6 +117,16 @@ const courses = [
 
 function cn(...classes: (string | false | undefined)[]) {
   return classes.filter(Boolean).join(' ');
+}
+
+function downloadBrowserFile(filename: string, contents: string, type: string) {
+  const blob = new Blob([contents], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function Badge({ children, tone = 'slate' }: { children: ReactNode; tone?: 'slate' | 'amber' | 'teal' | 'coral' | 'violet' | 'green' }) {
@@ -185,6 +208,17 @@ function Welcome({ onSelect }: { onSelect: (role: Role) => void }) {
 function Sidebar({ role, collapsed, setCollapsed, onNavigate }: { role: Role; collapsed: boolean; setCollapsed: (value: boolean) => void; onNavigate?: () => void }) {
   const [location] = useLocation();
   const roleLabel = roles.find(r => r.id === role)?.title ?? 'Stakeholder';
+  const groups = role === 'student'
+    ? [
+        { label: 'My progress', items: studentNav.filter(item => item.group === 'My progress') },
+        { label: 'Explore opportunities', items: studentNav.filter(item => item.group === 'Explore opportunities') },
+        { label: 'Workspace', items: studentNav.filter(item => item.group === 'Workspace') },
+      ]
+    : [
+        { label: 'Decision room', items: nav.filter(item => item.group === 'Decision room' || (!item.group && ['Labour market', 'Skill gaps', 'District planning'].includes(item.label))) },
+        { label: 'Action studio', items: nav.filter(item => item.group === 'Action studio' || (!item.group && ['Career navigator', 'Employer demand'].includes(item.label))) },
+        { label: 'Workspace', items: nav.filter(item => item.group === 'Workspace' || (!item.group && ['Settings'].includes(item.label))) },
+      ];
   return (
     <aside className={cn('fixed inset-y-0 left-0 z-40 flex flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-300', collapsed ? 'w-[76px]' : 'w-[248px]')}>
       <div className="flex h-[78px] items-center justify-between border-b border-sidebar-border px-4">
@@ -192,8 +226,8 @@ function Sidebar({ role, collapsed, setCollapsed, onNavigate }: { role: Role; co
         <button type="button" data-testid="button-collapse-sidebar" onClick={() => setCollapsed(!collapsed)} className="hidden rounded-lg p-2 text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground md:block">{collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}</button>
       </div>
       <div className={cn('border-b border-sidebar-border px-3 py-4', collapsed && 'px-2')}><div className={cn('flex items-center gap-3 rounded-xl bg-sidebar-accent px-3 py-2.5', collapsed && 'justify-center px-0')}><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-xs font-bold text-sidebar-primary-foreground">{roleLabel.charAt(0)}</span>{!collapsed && <div className="min-w-0"><p className="truncate text-xs font-semibold">{roleLabel}</p><p className="text-[10px] text-sidebar-foreground/55">Preview workspace</p></div>}</div></div>
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {['Decision room', 'Action studio', 'Workspace'].map(group => <div key={group} className="mb-5">{!collapsed && <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-data text-sidebar-foreground/40">{group}</p>}{nav.filter(item => item.group === group || (!item.group && ((group === 'Decision room' && ['Overview', 'Labour market', 'Skill gaps', 'District planning'].includes(item.label)) || (group === 'Action studio' && ['Course alignment', 'Career navigator', 'Employer demand'].includes(item.label)) || (group === 'Workspace' && ['Reports', 'Settings'].includes(item.label))))).map(item => { const active = location === item.href; return <Link key={item.href} href={item.href} onClick={onNavigate} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`} className={cn('group mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors', active ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground', collapsed && 'justify-center px-0')}><item.icon size={17} strokeWidth={active ? 2.4 : 1.8} />{!collapsed && <span>{item.label}</span>}{!collapsed && active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-current" />}</Link>; })}</div>)}
+       <nav className="flex-1 overflow-y-auto px-3 py-4">
+         {groups.map(group => <div key={group.label} className="mb-5">{!collapsed && <p className="mb-2 px-3 text-[9px] font-bold uppercase tracking-data text-sidebar-foreground/40">{group.label}</p>}{group.items.map(item => { const active = location === item.href; return <Link key={item.href} href={item.href} onClick={onNavigate} data-testid={`link-nav-${item.label.toLowerCase().replaceAll(' ', '-')}`} className={cn('group mb-1 flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-medium transition-colors', active ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm' : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground', collapsed && 'justify-center px-0')}><item.icon size={17} strokeWidth={active ? 2.4 : 1.8} />{!collapsed && <span>{item.label}</span>}{!collapsed && active && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-current" />}</Link>; })}</div>)}
       </nav>
       {!collapsed && <div className="m-3 rounded-xl border border-sidebar-border bg-sidebar-accent/50 p-3"><div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-data text-sidebar-foreground/60"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Data status</div><p className="mt-2 text-xs leading-5 text-sidebar-foreground/70">Local preview data is current to Q4 FY25.</p></div>}
       <div className="border-t border-sidebar-border p-3"><button type="button" data-testid="button-help" className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-xs text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-foreground', collapsed && 'justify-center px-0')}><CircleHelp size={17} />{!collapsed && <span>Need a hand?</span>}</button></div>
@@ -291,10 +325,16 @@ function ProfileDrawer({ profile, onClose, onSave }: { profile: ProfileDetails; 
 }
 
 function Topbar({ role, onMenu, notificationsOpen, onNotifications, onProfile }: { role: Role; onMenu: () => void; notificationsOpen: boolean; onNotifications: () => void; onProfile: () => void }) {
-  const [location] = useLocation();
-  const current = nav.find(item => item.href === location)?.label ?? 'Overview';
+  const [location, setLocation] = useLocation();
+  const current = (role === 'student' ? studentNav : nav).find(item => item.href === location)?.label ?? 'Overview';
   const roleLabel = roles.find(r => r.id === role)?.title ?? 'Stakeholder';
-  return <header className="relative sticky top-0 z-30 flex h-[78px] items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><button type="button" data-testid="button-open-menu" onClick={onMenu} className="rounded-lg p-2 text-muted-foreground hover:bg-muted md:hidden"><Menu size={20} /></button><div><p className="text-[10px] font-bold uppercase tracking-data text-muted-foreground">Maharashtra / {roleLabel}</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">{current}</h2></div></div><div className="flex items-center gap-2 sm:gap-4"><div className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground lg:flex"><Search size={14} /><span>Search signals</span><kbd className="ml-6 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘ K</kbd></div><button type="button" data-testid="button-notifications" aria-label="Open notifications" aria-expanded={notificationsOpen} onClick={onNotifications} className={cn('relative rounded-xl p-2.5 text-muted-foreground hover:bg-muted', notificationsOpen && 'bg-muted text-foreground')}><Bell size={18} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#e56d52]" /></button><div className="hidden h-7 w-px bg-border sm:block" /><button type="button" data-testid="button-profile" aria-label="Open profile" onClick={onProfile} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2e8b78] text-xs font-bold text-white transition-transform hover:scale-105">AK</button></div>{notificationsOpen && <NotificationPopover onClose={onNotifications} />}</header>;
+  const goBack = () => {
+    window.history.back();
+  };
+  const goForward = () => {
+    window.history.forward();
+  };
+  return <header className="relative sticky top-0 z-30 flex h-[78px] items-center justify-between border-b border-border bg-background/90 px-5 backdrop-blur-md sm:px-8"><div className="flex items-center gap-3"><button type="button" data-testid="button-open-menu" onClick={onMenu} className="rounded-lg p-2 text-muted-foreground hover:bg-muted md:hidden"><Menu size={20} /></button><div><p className="text-[10px] font-bold uppercase tracking-data text-muted-foreground">Maharashtra / {roleLabel}</p><h2 className="mt-1 text-lg font-bold tracking-tight text-foreground">{current}</h2></div></div><div className="flex items-center gap-1.5 sm:gap-3"><div className="hidden items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground lg:flex"><Search size={14} /><span>Search signals</span><kbd className="ml-6 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px]">⌘ K</kbd></div><div className="flex items-center rounded-xl border border-border bg-card p-0.5"><button type="button" data-testid="button-home" aria-label="Return to landing page" title="Landing page" onClick={() => setLocation('/')} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><House size={16} /></button><button type="button" data-testid="button-history-back" aria-label="Go back" title="Back" onClick={goBack} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ArrowLeft size={16} /></button><button type="button" data-testid="button-history-forward" aria-label="Go forward" title="Forward" onClick={goForward} className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ArrowRight size={16} /></button></div><button type="button" data-testid="button-notifications" aria-label="Open notifications" aria-expanded={notificationsOpen} onClick={onNotifications} className={cn('relative rounded-xl p-2.5 text-muted-foreground hover:bg-muted', notificationsOpen && 'bg-muted text-foreground')}><Bell size={18} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[#e56d52]" /></button><div className="hidden h-7 w-px bg-border sm:block" /><button type="button" data-testid="button-profile" aria-label="Open profile" onClick={onProfile} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#2e8b78] text-xs font-bold text-white transition-transform hover:scale-105">AK</button></div>{notificationsOpen && <NotificationPopover onClose={onNotifications} />}</header>;
 }
 
 function Shell({ children, role, setRole }: { children: ReactNode; role: Role; setRole: (role: Role) => void }) {
@@ -324,6 +364,59 @@ function PageIntro({ eyebrow, title, description, action }: { eyebrow: string; t
 
 function FilterStrip({ timeframe, setTimeframe, district, setDistrict }: { timeframe: string; setTimeframe: (value: string) => void; district: string; setDistrict: (value: string) => void }) {
   return <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-2"><div className="flex items-center gap-2 px-2 text-xs font-semibold text-muted-foreground"><Filter size={14} /> View as</div><select value={timeframe} onChange={e => setTimeframe(e.target.value)} data-testid="select-timeframe" className="rounded-lg border-0 bg-muted px-3 py-2 text-xs font-semibold text-foreground outline-none"><option>Last 12 months</option><option>Last 6 months</option><option>FY 2024–25</option></select><select value={district} onChange={e => setDistrict(e.target.value)} data-testid="select-district" className="rounded-lg border-0 bg-muted px-3 py-2 text-xs font-semibold text-foreground outline-none"><option>All Maharashtra</option><option>Pune</option><option>Thane</option><option>Nashik</option><option>Nagpur</option></select><span className="ml-auto hidden items-center gap-1 px-3 text-[11px] text-muted-foreground sm:flex"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Updated 18 min ago</span></div>;
+}
+
+function StudentDashboard() {
+  const [interest, setInterest] = useState('Technology & digital');
+  const [savedPaths, setSavedPaths] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('skillsync-student-saved-paths') ?? '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
+  const [refreshed, setRefreshed] = useState(false);
+  const recommendations = [
+    { title: 'Industrial IoT technician', match: 92, detail: 'Build, monitor, and improve connected factory systems.', href: '/career-navigator', tone: 'teal' as const },
+    { title: 'Data operations associate', match: 86, detail: 'Turn business data into clear decisions for growing teams.', href: '/career-navigator', tone: 'amber' as const },
+    { title: 'Solar PV design assistant', match: 78, detail: 'Help Maharashtra move faster toward clean energy.', href: '/career-navigator', tone: 'violet' as const },
+  ];
+  const toggleSaved = (title: string) => {
+    const next = savedPaths.includes(title) ? savedPaths.filter(path => path !== title) : [...savedPaths, title];
+    setSavedPaths(next);
+    localStorage.setItem('skillsync-student-saved-paths', JSON.stringify(next));
+  };
+  return <><PageIntro eyebrow="My progress" title="Your next move starts here." description="Use Maharashtra demand signals to choose a direction, build the right skills, and find a course that moves you closer to work." action={<button type="button" data-testid="button-refresh-recommendations" onClick={() => setRefreshed(true)} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-semibold text-foreground hover:bg-muted"><RefreshCw size={14} /> {refreshed ? 'Recommendations refreshed' : 'Refresh recommendations'}</button>} /><div className="grid gap-6 lg:grid-cols-[.72fr_1.28fr]"><Card className="bg-[#173746] p-6 text-[#f4f0e5]"><div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#e1a329] text-[#173746]"><Target size={20} /></div><p className="mt-6 text-xl font-bold">Start with what interests you.</p><p className="mt-2 text-sm leading-6 text-[#b9cbc8]">We will connect your curiosity to growing sectors, useful courses, and real roles near you.</p><label className="mt-8 block text-[10px] font-bold uppercase tracking-data text-[#b9cbc8]" htmlFor="student-interest">I am curious about</label><select id="student-interest" value={interest} onChange={event => setInterest(event.target.value)} data-testid="select-student-interest" className="mt-2 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm text-white outline-none"><option className="text-[#173746]">Technology & digital</option><option className="text-[#173746]">Machines & making</option><option className="text-[#173746]">Climate & energy</option><option className="text-[#173746]">People & healthcare</option></select><Link href="/career-navigator" data-testid="link-student-career-navigator" className="mt-6 flex items-center justify-between rounded-xl bg-[#f4f0e5] px-4 py-3 text-xs font-bold text-[#173746] hover:bg-white">Open career navigator <ArrowRight size={15} /></Link></Card><div><div className="mb-3 flex items-end justify-between gap-4"><div><p className="text-sm font-bold">Recommended paths</p><p className="mt-1 text-xs text-muted-foreground">Based on {interest.toLowerCase()} and current Maharashtra demand.</p></div><Link href="/skill-gaps" className="text-xs font-bold text-primary hover:underline">View skill gaps</Link></div><div className="space-y-3">{recommendations.map(path => { const isSaved = savedPaths.includes(path.title); return <Card key={path.title} className="p-4 transition-transform hover:-translate-y-0.5"><div className="flex items-start gap-3"><div className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl', path.tone === 'teal' ? 'bg-teal-100 text-teal-700' : path.tone === 'amber' ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700')}><Sparkles size={17} /></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-bold">{path.title}</p><Badge tone="green">{path.match}% match</Badge></div><p className="mt-1 text-xs leading-5 text-muted-foreground">{path.detail}</p></div><button type="button" data-testid={`button-save-student-path-${path.title.toLowerCase().replaceAll(' ', '-')}`} onClick={() => toggleSaved(path.title)} className={cn('rounded-lg px-2.5 py-2 text-[11px] font-bold transition-colors', isSaved ? 'bg-amber-100 text-amber-700' : 'bg-muted text-muted-foreground hover:text-foreground')}>{isSaved ? 'Saved' : 'Save'}</button></div><div className="mt-4 flex items-center justify-between border-t border-border pt-3"><span className="text-[11px] text-muted-foreground">Interest: {interest}</span><Link href={path.href} data-testid={`link-explore-student-path-${path.title.toLowerCase().replaceAll(' ', '-')}`} className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">Explore path <ChevronRight size={14} /></Link></div></Card>; })}</div></div></div><Card className="mt-6 p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-bold">Your saved paths</p><p className="mt-1 text-xs text-muted-foreground">{savedPaths.length ? `${savedPaths.length} path${savedPaths.length === 1 ? '' : 's'} saved in this browser.` : 'Save a path above to keep it handy while you compare options.'}</p></div><Link href="/course-alignment" data-testid="link-student-courses" className="flex items-center gap-1 text-xs font-bold text-primary hover:underline">Browse courses <BookOpen size={14} /></Link></div></Card></>;
+}
+
+function StudentLabourMarket() {
+  const [sector, setSector] = useState('All sectors');
+  const [exported, setExported] = useState(false);
+  const sectors = [
+    { name: 'Advanced manufacturing', posts: '68,400', growth: 22, action: 'Explore machines & making' },
+    { name: 'Digital & IT services', posts: '57,400', growth: 18, action: 'Explore technology & digital' },
+    { name: 'Healthcare services', posts: '42,100', growth: 15, action: 'Explore people & healthcare' },
+    { name: 'Renewable energy', posts: '18,400', growth: 27, action: 'Explore climate & energy' },
+  ];
+  const visible = sector === 'All sectors' ? sectors : sectors.filter(item => item.name === sector);
+  const exportMarket = () => {
+    downloadBrowserFile('skillsync-student-market-snapshot.csv', `sector,open_positions,growth\n${visible.map(item => `${item.name},${item.posts},${item.growth}%`).join('\n')}`, 'text/csv');
+    setExported(true);
+  };
+  return <><PageIntro eyebrow="Explore opportunities" title="Where your skills can take you." description="Compare growing sectors before you choose what to learn next." action={<button type="button" data-testid="button-student-export-market" onClick={exportMarket} className="flex items-center gap-2 rounded-xl bg-primary px-3.5 py-2.5 text-xs font-bold text-primary-foreground hover:brightness-110"><Download size={14} /> {exported ? 'Snapshot downloaded' : 'Export snapshot'}</button>} /><div className="mb-6 flex flex-wrap gap-2">{['All sectors', ...sectors.map(item => item.name)].map(option => <button type="button" key={option} data-testid={`button-student-sector-${option.toLowerCase().replaceAll(' ', '-')}`} onClick={() => { setSector(option); setExported(false); }} className={cn('rounded-full border px-4 py-2 text-xs font-semibold transition-colors', sector === option ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted')}>{option}</button>)}</div><div className="grid gap-4 sm:grid-cols-2">{visible.map(item => <Card key={item.name} className="p-5"><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-bold">{item.name}</p><p className="mt-1 text-xs text-muted-foreground">Open positions tracked in Maharashtra</p></div><Badge tone="green">+{item.growth}%</Badge></div><p className="display-font mt-6 text-4xl font-bold text-primary">{item.posts}</p><p className="mt-1 text-[11px] text-muted-foreground">open positions</p><Link href="/career-navigator" data-testid={`link-student-sector-${item.name.toLowerCase().replaceAll(' ', '-')}`} className="mt-5 flex items-center justify-between rounded-xl bg-muted px-3 py-2.5 text-xs font-bold text-foreground hover:bg-secondary">{item.action}<ChevronRight size={14} /></Link></Card>)}</div><Card className="mt-6 bg-[#173746] p-6 text-[#f4f0e5]"><p className="text-[10px] font-bold uppercase tracking-data text-[#e1a329]">Student signal</p><p className="mt-2 max-w-2xl text-lg font-bold">Renewable energy is growing fastest, while digital skills travel across every sector.</p><p className="mt-2 max-w-2xl text-xs leading-5 text-[#b9cbc8]">Use the Career navigator to compare the time to entry, course options, and the districts where opportunities are concentrated.</p></Card></>;
+}
+
+function StudentSkillGaps() {
+  const [selected, setSelected] = useState('All skills');
+  const [interventionCreated, setInterventionCreated] = useState(false);
+  const gaps = [
+    { skill: 'Digital tools', category: 'Technology', demand: 88, readiness: 53, next: 'Practice spreadsheets, data handling, and basic automation.' },
+    { skill: 'Battery management systems', category: 'Machines', demand: 81, readiness: 29, next: 'Look for a short EV or electrical systems bridge course.' },
+    { skill: 'Communication', category: 'People', demand: 74, readiness: 58, next: 'Build confidence through project presentations and teamwork.' },
+    { skill: 'Solar design', category: 'Climate', demand: 69, readiness: 38, next: 'Explore solar PV design fundamentals and field practice.' },
+  ];
+  const visible = selected === 'All skills' ? gaps : gaps.filter(item => item.category === selected);
+  return <><PageIntro eyebrow="My progress" title="Know what to build next." description="See the skills employers are asking for and choose a practical next step." /><div className="mb-6 flex flex-wrap gap-2">{['All skills', 'Technology', 'Machines', 'People', 'Climate'].map(filter => <button type="button" key={filter} data-testid={`button-student-gap-${filter.toLowerCase()}`} onClick={() => setSelected(filter)} className={cn('rounded-full border px-4 py-2 text-xs font-semibold transition-colors', selected === filter ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground hover:bg-muted')}>{filter}</button>)}</div><div className="space-y-3">{visible.map(item => { const gap = item.demand - item.readiness; return <Card key={item.skill} className="p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm font-bold">{item.skill}</p><p className="mt-1 text-xs text-muted-foreground">{item.next}</p></div><Badge tone={gap > 35 ? 'coral' : 'amber'}>{gap} pt gap</Badge></div><div className="mt-5"><div className="mb-2 flex justify-between text-[10px] uppercase tracking-data text-muted-foreground"><span>Your readiness · {item.readiness}%</span><span>Employer demand · {item.demand}%</span></div><div className="relative h-3 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-[#2e8b78]" style={{ width: `${item.readiness}%` }} /><div className="absolute inset-y-0 border-r-2 border-[#173746]" style={{ left: `${item.demand}%` }} /></div></div><Link href="/course-alignment" data-testid={`link-student-gap-course-${item.skill.toLowerCase().replaceAll(' ', '-')}`} className="mt-4 flex w-fit items-center gap-1 text-xs font-bold text-primary hover:underline">Find a course <ChevronRight size={14} /></Link></Card>; })}</div><Card className="mt-6 border-amber-200 bg-amber-50/70 p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-bold text-amber-950">Need a clearer plan?</p><p className="mt-1 text-xs text-amber-900/75">Create a local action brief from the skill you are viewing.</p></div><button type="button" data-testid="button-student-create-intervention" onClick={() => setInterventionCreated(true)} className="flex items-center gap-2 rounded-xl bg-[#173746] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#234b5b]"><Check size={14} /> {interventionCreated ? 'Plan created' : 'Create my action plan'}</button></div>{interventionCreated && <p className="mt-4 border-t border-amber-200 pt-3 text-xs font-semibold text-emerald-800">Your action plan is ready. Continue to Course alignment to choose the first course.</p>}</Card></>;
 }
 
 function Dashboard({ role }: { role: Role }) {
@@ -393,9 +486,9 @@ function Workspace({ role, setRole }: { role: Role; setRole: (role: Role) => voi
   const [location] = useLocation();
   const page = useMemo(() => {
     switch (location) {
-      case '/dashboard': return <Dashboard role={role} />;
-      case '/labour-market': return <LabourMarket />;
-      case '/skill-gaps': return <SkillGaps />;
+      case '/dashboard': return role === 'student' ? <StudentDashboard /> : <Dashboard role={role} />;
+      case '/labour-market': return role === 'student' ? <StudentLabourMarket /> : <LabourMarket />;
+      case '/skill-gaps': return role === 'student' ? <StudentSkillGaps /> : <SkillGaps />;
       case '/district-planning': return <DistrictPlanning />;
       case '/course-alignment': return <CourseAlignment />;
       case '/career-navigator': return <CareerNavigator />;
